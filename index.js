@@ -71,63 +71,67 @@ async function scrapeStaticWebsite(url = "") {
     })
     return { head: pageHead, body: pageBody, internalLinks, externalLinks };
 }
-//This function for client side rendering web pages like React Vite
+
 async function scrapeReactWebsite(url = "") {
+    if (!url) {
+        throw new Error("A website URL is required.");
+    }
+
     const browser = await puppeteer.launch({
         headless: true,
     });
 
-    const page = await browser.newPage();
+    try {
+        const page = await browser.newPage();
 
-    await page.goto(url, {
-        waitUntil: "networkidle2",
-    });
+        await page.goto(url, {
+            waitUntil: "domcontentloaded",
+            timeout: 45000,
+        });
 
-    const html = await page.content();
-    const $ = cheerio.load(html);
+        const html = await page.content();
+        const $ = cheerio.load(html);
 
-    const pageHead = $("head").html();
+        const pageHead = $("head").html();
 
-    const pageBody = await page.evaluate(() =>
-        document.body.innerText.replace(/\s+/g, " ").trim()
-    );
+        const pageBody = await page.evaluate(() =>
+            document.body?.innerText.replace(/\s+/g, " ").trim() ?? ""
+        );
 
-    // console.log("Characters:", pageBody.length);
-    // console.log("Preview:", pageBody.slice(0, 300));
+        const internalLinks = [];
+        const externalLinks = [];
 
-    await browser.close();
+        $("a").each((_, element) => {
+            const link = $(element).attr("href");
 
-    const internalLinks = [];
-    const externalLinks = [];
+            if (!link) return;
 
-    $("a").each((_, element) => {
-        const link = $(element).attr("href");
+            // Skip anchors, email, phone and JavaScript links
+            if (
+                link.startsWith("#") ||
+                link.startsWith("mailto:") ||
+                link.startsWith("tel:") ||
+                link.startsWith("javascript:")
+            ) {
+                return;
+            }
 
-        if (!link) return;
+            if (/^https?:\/\//i.test(link)) {
+                externalLinks.push(link);
+            } else {
+                internalLinks.push(link);
+            }
+        });
 
-        // Skip anchors, email, phone and JS links
-        if (
-            link.startsWith("#") ||
-            link.startsWith("mailto:") ||
-            link.startsWith("tel:") ||
-            link.startsWith("javascript:")
-        ) {
-            return;
-        }
-
-        if (link.startsWith("http")) {
-            externalLinks.push(link);
-        } else {
-            internalLinks.push(link);
-        }
-    });
-
-    return {
-        head: pageHead,
-        body: pageBody,
-        internalLinks,
-        externalLinks,
-    };
+        return {
+            head: pageHead,
+            body: pageBody,
+            internalLinks,
+            externalLinks,
+        };
+    } finally {
+        await browser.close();
+    }
 }
 
 async function generateVectorEmbeddings({ text }) {
@@ -207,7 +211,7 @@ export function chunkText(text, chunkSize = 300) {
 }
 
 console.log("🚀 Starting ingestion...");
-await ingest('https://anupbh77.github.io');
+await ingest('https://prepai-app.vercel.app/');
 
 async function chat(question = '') {
     const questionEmbedding = await generateVectorEmbeddings({ text: question });
