@@ -7,7 +7,12 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "worker": "node src/worker.js",
+    "dev:worker": "node --watch src/worker.js",
+    "api": "node src/server.js",
+    "dev:api": "node --watch src/server.js"
   },
   "dependencies": {
     "@chroma-core/default-embed": "^0.1.9",

@@ -1,9 +1,21 @@
 services:
-  Chromadb:
+  chromadb:
     image: chromadb/chroma
-    container_name: chromadb
     ports:
-      - 8000:8000
+      - "8001:8000"
     volumes:
-      - ./chroma_data:/data
+      - chroma_data:/data
+    restart: unless-stopped
 
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: valkey-server --appendonly yes
+    ports:
+      - "6380:6379"
+    volumes:
+      - valkey_data:/data
+    restart: unless-stopped
+
+volumes:
+  chroma_data:
+  valkey_data:
