@@ -1,6 +1,7 @@
 
 import express from "express";
 import cors from "cors";
+import { answerQuestion } from "./services/answer.service.js";
 import {
   enqueueCrawl,
   getCrawlJob,
@@ -8,9 +9,21 @@ import {
 
 const app = express();
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+];
+
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+    origin(origin, callback) {
+      // Allow requests without an Origin header, such as local CLI tools.
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Origin not allowed by CORS"));
+    },
   })
 );
 
@@ -99,6 +112,34 @@ app.use((error, _req, res, _next) => {
   return res.status(500).json({
     error: "Internal server error.",
   });
+});
+
+
+app.post("/api/chat", async (req, res) => {
+  try {
+    const { question, websiteUrl } = req.body ?? {};
+
+    if (
+      typeof question !== "string" ||
+      !question.trim() ||
+      typeof websiteUrl !== "string" ||
+      !websiteUrl.trim()
+    ) {
+      return res.status(400).json({
+        error: "Both question and websiteUrl are required.",
+      });
+    }
+
+    const result = await answerQuestion(question, websiteUrl);
+
+    return res.json(result);
+  } catch (error) {
+    console.error("[API] Chat failed:", error);
+
+    return res.status(500).json({
+      error: "Unable to answer the question right now.",
+    });
+  }
 });
 
 export default app;

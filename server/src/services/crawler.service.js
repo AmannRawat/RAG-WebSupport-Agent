@@ -62,6 +62,7 @@ export async function crawlWebsite(startUrl, options = {}) {
                     id: `${normalizedUrl}::head`,
                     embedding,
                     url: normalizedUrl,
+                    websiteUrl: allowedOrigin,
                     text: head,
                     title: "",
                 });
@@ -78,6 +79,7 @@ export async function crawlWebsite(startUrl, options = {}) {
                     id: `${normalizedUrl}::chunk-${index}`,
                     embedding,
                     url: normalizedUrl,
+                    websiteUrl: allowedOrigin,
                     text: chunk,
                     title: "",
                 });
