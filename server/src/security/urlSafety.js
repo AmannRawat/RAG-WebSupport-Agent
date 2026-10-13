@@ -16,6 +16,7 @@ export async function validatePublicHttpUrl(value) {
     throw new Error("Only HTTP and HTTPS URLs are allowed.");
   }
 
+  //Checks for an empty or invalid hostname or credentials
   if (
     !url.hostname ||
     url.username ||

@@ -1,4 +1,3 @@
-
 import "dotenv/config";
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
@@ -21,11 +20,18 @@ const worker = new Worker(
 
     await job.updateProgress(10);
 
-    const result = await crawlWebsite(url);
+    const result = await crawlWebsite(url, {
+      jobId: String(job.id),
+    });
+    console.log(`[Worker] Job ${job.id} result:`, result);
+
+    if (result.status === "failed") {
+      throw new Error(
+        `Crawl failed: no pages were processed successfully for ${url}`
+      );
+    }
 
     await job.updateProgress(100);
-
-    console.log(`[Worker] Job ${job.id} finished:`, result);
 
     return result;
   },

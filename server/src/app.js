@@ -11,6 +11,7 @@ import {
   chatRateLimit,
 } from "./middleware/rateLimiters.js";
 const app = express();
+import { validatePublicHttpUrl } from "./security/urlSafety.js";
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -38,7 +39,7 @@ app.get("/health", (_req, res) => {
 });
 
 // Submit a website crawl
-app.post("/api/crawls",crawlRateLimit, async (req, res) => {
+app.post("/api/crawls", crawlRateLimit, async (req, res) => {
   try {
     const { url } = req.body ?? {};
 
@@ -51,21 +52,10 @@ app.post("/api/crawls",crawlRateLimit, async (req, res) => {
     let parsedUrl;
 
     try {
-      parsedUrl = new URL(url.trim());
-    } catch {
+      parsedUrl = await validatePublicHttpUrl(url.trim());
+    } catch (error) {
       return res.status(400).json({
-        error: "Please provide a valid URL.",
-      });
-    }
-
-    if (
-      !["http:", "https:"].includes(parsedUrl.protocol) ||
-      !parsedUrl.hostname ||
-      parsedUrl.username ||
-      parsedUrl.password
-    ) {
-      return res.status(400).json({
-        error: "Please provide a valid HTTP or HTTPS website URL.",
+        error: error.message || "Invalid website URL.",
       });
     }
 
@@ -118,7 +108,7 @@ app.use((error, _req, res, _next) => {
 });
 
 
-app.post("/api/chat", chatRateLimit,async (req, res) => {
+app.post("/api/chat", chatRateLimit, async (req, res) => {
   try {
     const { question, websiteUrl } = req.body ?? {};
 
