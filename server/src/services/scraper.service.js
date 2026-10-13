@@ -50,6 +50,10 @@ export async function scrapeStaticWebsite(url) {
 export async function scrapeReactWebsite(url) {
     const browser = await puppeteer.launch({
         headless: true,
+        args:
+            process.env.PUPPETEER_NO_SANDBOX === "true"
+                ? ["--no-sandbox", "--disable-setuid-sandbox"]
+                : [],
     });
 
     try {

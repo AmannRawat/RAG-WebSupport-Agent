@@ -6,7 +6,10 @@ import {
   enqueueCrawl,
   getCrawlJob,
 } from "./services/crawlQueue.service.js";
-
+import {
+  crawlRateLimit,
+  chatRateLimit,
+} from "./middleware/rateLimiters.js";
 const app = express();
 
 const allowedOrigins = [
@@ -35,7 +38,7 @@ app.get("/health", (_req, res) => {
 });
 
 // Submit a website crawl
-app.post("/api/crawls", async (req, res) => {
+app.post("/api/crawls",crawlRateLimit, async (req, res) => {
   try {
     const { url } = req.body ?? {};
 
@@ -115,7 +118,7 @@ app.use((error, _req, res, _next) => {
 });
 
 
-app.post("/api/chat", async (req, res) => {
+app.post("/api/chat", chatRateLimit,async (req, res) => {
   try {
     const { question, websiteUrl } = req.body ?? {};
 
