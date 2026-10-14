@@ -2,13 +2,7 @@
 import { crawlQueue } from "../config/queue.js";
 
 export async function enqueueCrawl(url) {
-  const job = await crawlQueue.add(
-    "crawl-website",
-    { url },
-    {
-      jobId: undefined,
-    }
-  );
+  const job = await crawlQueue.add("crawl-website", { url });
 
   return {
     jobId: job.id,

@@ -108,6 +108,7 @@ app.use((error, _req, res, _next) => {
 });
 
 
+
 app.post("/api/chat", chatRateLimit, async (req, res) => {
   try {
     const { question, websiteUrl } = req.body ?? {};
@@ -123,7 +124,20 @@ app.post("/api/chat", chatRateLimit, async (req, res) => {
       });
     }
 
-    const result = await answerQuestion(question, websiteUrl);
+    let parsedUrl;
+
+    try {
+      parsedUrl = await validatePublicHttpUrl(websiteUrl.trim());
+    } catch (error) {
+      return res.status(400).json({
+        error: error.message || "Invalid website URL.",
+      });
+    }
+
+    const result = await answerQuestion(
+      question.trim(),
+      parsedUrl.href
+    );
 
     return res.json(result);
   } catch (error) {

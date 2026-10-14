@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import {
   Globe,
@@ -29,8 +28,14 @@ export default function App() {
   const [chatLoading, setChatLoading] = useState(false);
 
   const state = job?.state || job?.status;
+  const crawlResultStatus = job?.result?.status;
+
   const completed = state === "completed";
   const failed = state === "failed";
+
+  const partiallyCompleted =
+    completed && crawlResultStatus === "partial";
+
   const active = Boolean(job && !completed && !failed);
   const websiteUrl = job?.url || job?.result?.websiteUrl || "";
 
@@ -40,10 +45,18 @@ export default function App() {
     async function checkHealth() {
       try {
         const response = await fetch(`${API_URL}/health`);
-        if (!response.ok) throw new Error("API unavailable");
-        if (!cancelled) setApiOnline(true);
+
+        if (!response.ok) {
+          throw new Error("API unavailable");
+        }
+
+        if (!cancelled) {
+          setApiOnline(true);
+        }
       } catch {
-        if (!cancelled) setApiOnline(false);
+        if (!cancelled) {
+          setApiOnline(false);
+        }
       }
     }
 
@@ -64,6 +77,7 @@ export default function App() {
         const response = await fetch(
           `${API_URL}/api/crawls/${encodeURIComponent(job.jobId)}`
         );
+
         const data = await response.json();
 
         if (!response.ok) {
@@ -72,6 +86,7 @@ export default function App() {
 
         if (!cancelled) {
           setError("");
+
           setJob((current) =>
             current?.jobId === data.jobId ? data : current
           );
@@ -91,6 +106,7 @@ export default function App() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+
     setError("");
     setJob(null);
     setMessages([]);
@@ -100,8 +116,12 @@ export default function App() {
     try {
       const response = await fetch(`${API_URL}/api/crawls`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: url.trim(),
+        }),
       });
 
       const data = await response.json();
@@ -126,6 +146,7 @@ export default function App() {
     event.preventDefault();
 
     const userQuestion = question.trim();
+
     if (!userQuestion || !websiteUrl || chatLoading) return;
 
     setError("");
@@ -134,13 +155,18 @@ export default function App() {
 
     setMessages((current) => [
       ...current,
-      { role: "user", text: userQuestion },
+      {
+        role: "user",
+        text: userQuestion,
+      },
     ]);
 
     try {
       const response = await fetch(`${API_URL}/api/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           websiteUrl,
           question: userQuestion,
@@ -181,10 +207,13 @@ export default function App() {
             <div className="rounded-xl bg-cyan-400/10 p-2.5 text-cyan-300">
               <Globe size={23} />
             </div>
+
             <div>
-              <p className="font-semibold tracking-tight">Site Intelligence</p>
+              <p className="font-semibold tracking-tight">
+                Site Intelligence
+              </p>
               <p className="text-xs text-slate-400">
-                Website crawling & RAG assistant
+                Website crawling &amp; RAG assistant
               </p>
             </div>
           </div>
@@ -232,6 +261,7 @@ export default function App() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-white/10 bg-slate-900 px-4">
               <Globe size={19} className="shrink-0 text-slate-500" />
+
               <input
                 id="website-url"
                 type="url"
@@ -253,6 +283,7 @@ export default function App() {
               ) : (
                 <Search size={18} />
               )}
+
               {loading ? "Submitting..." : "Start crawl"}
             </button>
           </div>
@@ -277,10 +308,13 @@ export default function App() {
                   ID: {job.jobId}
                 </p>
               </div>
-              {completed ? (
-                <CheckCircle2 className="shrink-0 text-emerald-400" />
-              ) : failed ? (
+
+              {failed ? (
                 <CircleAlert className="shrink-0 text-red-400" />
+              ) : partiallyCompleted ? (
+                <CircleAlert className="shrink-0 text-amber-300" />
+              ) : completed ? (
+                <CheckCircle2 className="shrink-0 text-emerald-400" />
               ) : (
                 <LoaderCircle className="shrink-0 animate-spin text-cyan-300" />
               )}
@@ -288,16 +322,25 @@ export default function App() {
 
             <div className="mt-4 flex items-center gap-2 text-sm">
               <Clock3 size={16} className="text-slate-400" />
-              <span className="capitalize">{state || "waiting"}</span>
+              <span className="capitalize">
+                {partiallyCompleted ? "partially completed" : state || "waiting"}
+              </span>
             </div>
 
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
               <div
                 className={`h-full rounded-full transition-all ${
-                  failed ? "bg-red-400" : "bg-cyan-300"
+                  failed
+                    ? "bg-red-400"
+                    : partiallyCompleted
+                      ? "bg-amber-300"
+                      : "bg-cyan-300"
                 }`}
                 style={{
-                  width: `${Math.max(0, Math.min(100, Number(job.progress) || 0))}%`,
+                  width: `${Math.max(
+                    0,
+                    Math.min(100, Number(job.progress) || 0)
+                  )}%`,
                 }}
               />
             </div>
@@ -313,9 +356,22 @@ export default function App() {
             )}
 
             {completed && (
-              <div className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-400/5 p-3 text-sm text-emerald-200">
-                <CheckCircle2 size={17} />
-                Website crawl completed successfully.
+              <div
+                className={`mt-4 flex items-center gap-2 rounded-xl p-3 text-sm ${
+                  partiallyCompleted
+                    ? "bg-amber-400/5 text-amber-200"
+                    : "bg-emerald-400/5 text-emerald-200"
+                }`}
+              >
+                {partiallyCompleted ? (
+                  <CircleAlert size={17} />
+                ) : (
+                  <CheckCircle2 size={17} />
+                )}
+
+                {partiallyCompleted
+                  ? "Crawl finished with some page failures. Available content was indexed."
+                  : "Website crawl completed successfully."}
               </div>
             )}
 
@@ -339,6 +395,7 @@ export default function App() {
                 <div className="rounded-xl bg-cyan-300/10 p-2 text-cyan-300">
                   <MessageCircle size={21} />
                 </div>
+
                 <div>
                   <h2 className="font-semibold">Chat with this website</h2>
                   <p className="max-w-lg break-all text-xs text-slate-400">
@@ -353,7 +410,8 @@ export default function App() {
                 disabled={chatLoading || messages.length === 0}
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-300 hover:bg-white/5 disabled:opacity-40"
               >
-                <RefreshCw size={14} /> Clear chat
+                <RefreshCw size={14} />
+                Clear chat
               </button>
             </div>
 
@@ -361,7 +419,9 @@ export default function App() {
               {messages.length === 0 && (
                 <div className="m-auto max-w-md py-7 text-center">
                   <Bot size={30} className="mx-auto text-cyan-300" />
-                  <h3 className="mt-3 font-medium">Ask the website anything</h3>
+                  <h3 className="mt-3 font-medium">
+                    Ask the website anything
+                  </h3>
                   <p className="mt-2 text-sm leading-6 text-slate-400">
                     Answers use retrieved content from the indexed website.
                     Start with a question about its purpose, services, or
@@ -405,6 +465,7 @@ export default function App() {
                             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
                               Sources
                             </p>
+
                             <div className="flex flex-col gap-2">
                               {message.sources.map((source) => (
                                 <a
@@ -438,7 +499,10 @@ export default function App() {
 
               {chatLoading && (
                 <div className="flex items-center gap-3 text-sm text-slate-400">
-                  <LoaderCircle size={18} className="animate-spin text-cyan-300" />
+                  <LoaderCircle
+                    size={18}
+                    className="animate-spin text-cyan-300"
+                  />
                   Searching website content and generating an answer...
                 </div>
               )}
@@ -481,6 +545,7 @@ export default function App() {
                   )}
                 </button>
               </div>
+
               <p className="mt-2 text-xs text-slate-500">
                 Enter to send · Shift + Enter for a new line
               </p>

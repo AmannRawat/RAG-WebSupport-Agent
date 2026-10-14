@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
-import { crawlWebsite } from "./services/crawler.service.js";
+import { processCrawlJob } from "./services/crawlJobProcessor.js";
 
 const connection = new IORedis(
   process.env.VALKEY_URL || "redis://127.0.0.1:6380",
@@ -12,29 +12,7 @@ const connection = new IORedis(
 
 const worker = new Worker(
   "website-support-crawl",
-  async (job) => {
-    const { url } = job.data;
-
-    console.log(`\n[Worker] Starting crawl job ${job.id}`);
-    console.log(`[Worker] Website: ${url}`);
-
-    await job.updateProgress(10);
-
-    const result = await crawlWebsite(url, {
-      jobId: String(job.id),
-    });
-    console.log(`[Worker] Job ${job.id} result:`, result);
-
-    if (result.status === "failed") {
-      throw new Error(
-        `Crawl failed: no pages were processed successfully for ${url}`
-      );
-    }
-
-    await job.updateProgress(100);
-
-    return result;
-  },
+  processCrawlJob,
   {
     connection,
     concurrency: 1,
