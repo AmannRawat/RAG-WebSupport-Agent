@@ -1,9 +1,70 @@
 services:
-  Chromadb:
+  chromadb:
     image: chromadb/chroma
-    container_name: chromadb
     ports:
-      - 8000:8000
+      - "8001:8000"
     volumes:
-      - ./chroma_data:/data
+      - chroma_data:/data
+    restart: unless-stopped
 
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: valkey-server --appendonly yes
+    ports:
+      - "6380:6379"
+    volumes:
+      - valkey_data:/data
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    env_file:
+      - ./server/.env
+    environment:
+      PORT: "4000"
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: "8000"
+      PUPPETEER_NO_SANDBOX: "true"
+      VALKEY_URL: redis://valkey:6379
+      CLIENT_ORIGIN: http://localhost:5174
+    ports:
+      - "4000:4000"
+    depends_on:
+      - chromadb
+      - valkey
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    command: ["npm", "run", "worker"]
+    env_file:
+      - ./server/.env
+    environment:
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: "8000"
+      PUPPETEER_NO_SANDBOX: "true"
+      VALKEY_URL: redis://valkey:6379
+    depends_on:
+      - chromadb
+      - valkey
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:4000
+    ports:
+      - "5174:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  chroma_data:
+  valkey_data:
