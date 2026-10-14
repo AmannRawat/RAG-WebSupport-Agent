@@ -1,151 +1,106 @@
-# 🤖 RAG Web Support Agent
+# 🧠 SiteMind AI — Website Intelligence & Support Agent
 
-An AI-powered website support agent that crawls websites, indexes their content into a vector database, and answers user questions using Retrieval-Augmented Generation (RAG).
+**Turn any website into a searchable AI knowledge base.**
 
-Built with **React, Node.js, Express, BullMQ, Valkey, Puppeteer, Google Gemini, and ChromaDB**, the system separates website crawling into background jobs while keeping the API responsive.
+SiteMind AI is an AI-powered website support agent that crawls websites, indexes their content in a vector database, and answers questions using Retrieval-Augmented Generation (RAG).
 
-## Demo
+Built with **React, Node.js, Express, BullMQ, Valkey, Puppeteer, Google Gemini, and ChromaDB**, it combines asynchronous website crawling with semantic retrieval to generate answers grounded in website content.
 
-**Live Demo:** Coming soon
+## ✨ Features
 
-**Architecture Diagram:** [Architecture.png](./Architecture.png)
+- 🌐 **Website Crawling:** Crawl websites and discover internal links.
+- ⚛️ **JavaScript Rendering:** Extract content from React and other JavaScript-rendered websites using Puppeteer.
+- ⚙️ **Background Jobs:** Process long-running crawls asynchronously using BullMQ and Valkey.
+- 🔄 **Retry Mechanism:** Configure job retries with exponential backoff.
+- 📍 **Crawl Checkpointing:** Save page-level progress to help avoid repeating completed work after retries.
+- ✂️ **Text Chunking:** Split webpage content into smaller, retrieval-friendly chunks.
+- 🧠 **Vector Embeddings:** Generate embeddings using Google's `gemini-embedding-2` model.
+- 🗄️ **Vector Database:** Store embeddings, text, and metadata in ChromaDB.
+- 🔍 **Semantic Search:** Retrieve relevant content using vector similarity and website-specific filtering.
+- 💬 **AI-Powered Answers:** Generate answers using retrieved website content as context.
+- 🔗 **Source References:** Return source URLs alongside generated answers.
+- 📊 **Job Tracking:** Expose crawl status, progress, and results through API endpoints.
+- 🛡️ **URL Safety:** Validate website URLs and restrict access to unsafe network destinations.
+- ⚠️ **Partial Success Handling:** Preserve useful crawl results when some pages fail.
+- 🧪 **Automated Testing:** Test API routes and core services with Vitest and Supertest.
 
-<!-- Replace this placeholder with a real demo GIF or screenshot once available. -->
-<!-- ![RAG Web Support Agent Demo](./demo.gif) -->
+## 🏗️ System Architecture
 
-## Features
+The application separates website ingestion from question answering. Crawling runs in a background worker, while the API handles incoming requests and chat queries.
 
-- 🌐 **Website Crawling:** Extracts rendered content and internal links using Puppeteer.
-- ⚛️ **JavaScript-Rendered Pages:** Handles React and other client-rendered websites.
-- ⚙️ **Background Processing:** Uses BullMQ and Valkey to process crawl jobs asynchronously.
-- 🔄 **Retries and Recovery:** Configurable job retries with exponential backoff.
-- 📍 **Crawl Checkpointing:** Saves page-level checkpoints to avoid repeating completed work during retries.
-- ✂️ **Text Chunking:** Splits webpage content into smaller pieces for retrieval.
-- 🧠 **Vector Embeddings:** Generates embeddings using Google's `gemini-embedding-2` model.
-- 🗄️ **Vector Storage:** Stores webpage chunks, embeddings, and metadata in ChromaDB.
-- 🔍 **Semantic Retrieval:** Retrieves relevant content filtered by website origin.
-- 💬 **AI-Powered Answers:** Uses Gemini to generate answers grounded in retrieved website content.
-- 🔗 **Source References:** Returns source URLs alongside answers.
-- 📊 **Crawl Progress:** Tracks job status and progress through the API.
-- 🛡️ **URL Validation:** Restricts crawling to HTTP/HTTPS URLs and validates destinations against private-network access.
-- ⚠️ **Partial Crawl Handling:** Preserves useful results when some pages fail.
-- 🧪 **Automated Tests:** Uses Vitest and Supertest to test API routes and core services.
+![SiteMind AI System Architecture](https://github.com/AmannRawat/RAG-WebSupport-Agent/blob/main/Architecture.png?raw=true)
 
-## Architecture
+### Website ingestion pipeline
 
-The application separates the frontend, API, background worker, queue, and retrieval pipeline.
+**Website URL → Express API → BullMQ → Valkey → Background Worker → Puppeteer → Text Chunking → Gemini Embeddings → ChromaDB**
 
-```text
-                   React Frontend
-                         |
-                         v
-                    Express API
-                    /         \
-                   v           v
-             BullMQ Queue    Chat Service
-                   |              |
-                   v              v
-                 Valkey       Query Embedding
-                                  |
-                                  v
-                              ChromaDB
-                                  |
-                                  v
-                          Retrieved Context
-                                  |
-                                  v
-                            Gemini LLM
-                                  |
-                                  v
-                         Answer + Sources
+The crawler validates URLs, extracts rendered content, follows eligible same-origin links, generates embeddings, and stores indexed content. Page checkpoints help the crawler resume work after interruptions.
 
-Background Crawl Pipeline:
+### Question-answering pipeline
 
-Express API
-     |
-     v
-BullMQ Queue <----> Valkey
-     |
-     v
-Background Worker
-     |
-     v
-URL Validation
-     |
-     v
-Puppeteer Scraping
-     |
-     v
-Text Extraction and Chunking
-     |
-     v
-Gemini Embeddings
-     |
-     v
-ChromaDB + Crawl Checkpoints
-```
+**User Question → Express Chat API → Query Embedding → ChromaDB Similarity Search → Retrieved Context → Gemini Flash → Answer + Source URLs**
 
-### RAG Pipeline
+The system retrieves relevant website content before generating an answer. The model is instructed to acknowledge insufficient evidence instead of inventing website facts.
 
-**Indexing:** Website → URL validation → Scraping → Text extraction → Chunking → Embeddings → ChromaDB
-
-**Question answering:** Question → Query embedding → Similarity search → Retrieved context → Gemini → Answer with source URLs
-
-## Tech Stack
+## 🛠️ Tech Stack
 
 | Category | Technology |
 |---|---|
 | Frontend | React, Vite, Tailwind CSS |
 | Backend | Node.js, Express |
+| Language | JavaScript, ES Modules |
 | Background Jobs | BullMQ |
-| Queue / Cache Backend | Valkey |
+| Queue Backend | Valkey |
 | Web Scraping | Puppeteer |
 | AI / LLM | Google Gemini |
-| Embeddings | `gemini-embedding-2` |
+| Embedding Model | `gemini-embedding-2` |
 | Vector Database | ChromaDB |
 | Testing | Vitest, Supertest |
-| Containers | Docker, Docker Compose |
-| Language | JavaScript (ES Modules) |
+| Infrastructure | Docker, Docker Compose |
 
-## How It Works
+## ⚙️ How It Works
 
 ### 1. Submit a website
 
-The user submits a website URL through the frontend. The Express API validates the request and enqueues a crawl job instead of performing the entire crawl inside the HTTP request.
+The user submits a website URL through the React frontend. The Express API validates the request and adds a crawl job to the queue.
 
 ### 2. Process the crawl asynchronously
 
-A BullMQ worker consumes queued jobs using Valkey as its Redis-compatible backend. Job status and progress can be queried through the API.
+BullMQ manages crawl jobs using Valkey as its Redis-compatible backend. A separate worker consumes jobs, reports progress, and processes the crawl independently of the initial HTTP request.
 
-### 3. Scrape and extract content
+### 3. Crawl and extract website content
 
-Puppeteer loads webpages and extracts rendered text, page information, and internal links. The crawler restricts traversal to the starting website's origin and applies URL safety checks.
+Puppeteer renders JavaScript-heavy pages and extracts page content and internal links. The crawler normalizes URLs, tracks visited pages, enforces crawl limits, and applies URL safety checks.
 
-### 4. Chunk the content
+### 4. Chunk the extracted text
 
-Extracted text is divided into smaller chunks so relevant sections can be retrieved without sending an entire website to the language model.
+The extracted content is split into smaller chunks to make retrieval more focused and reduce the amount of text passed to the language model.
 
-### 5. Generate and store embeddings
+### 5. Generate embeddings
 
-The `gemini-embedding-2` model converts text chunks into vectors. The application stores vectors, original text, and metadata in ChromaDB.
+The `gemini-embedding-2` model converts text chunks into vector representations. The same embedding service is used to represent incoming user questions.
 
-### 6. Save crawl checkpoints
+### 6. Store the knowledge base
 
-The crawler stores page-level checkpoint data, including indexed chunk counts and discovered internal links. When a job resumes, valid checkpoints allow previously completed pages to be skipped.
+ChromaDB stores the vectors, original text, and associated metadata, including source URLs and website origin. Deterministic IDs and upserts help make repeated indexing safer.
 
-### 7. Retrieve relevant information
+### 7. Save crawl checkpoints
 
-When a user asks a question, the application embeds the query and searches ChromaDB for relevant chunks associated with the requested website origin.
+The crawler records completed-page information and discovered internal links. During a retry, valid checkpoints allow previously completed pages to be skipped.
 
-### 8. Generate a grounded answer
+### 8. Retrieve relevant information
 
-Gemini receives the question and retrieved content. The system instructs the model to avoid inventing website facts, acknowledge insufficient evidence, and treat retrieved content as untrusted data.
+The user's question is embedded and used to search ChromaDB for relevant chunks associated with the selected website.
 
-### 9. Return the answer and sources
+### 9. Generate grounded answers
 
-The API returns the generated answer and source URLs, which the frontend displays to the user.
+Gemini Flash receives the question and retrieved context. The prompt instructs the model to use the supplied evidence, identify insufficient information, and treat retrieved website content as untrusted data.
 
-## Project Structure
+### 10. Return answers and sources
+
+The API returns the generated answer and source URLs. The React frontend displays the response so users can trace answers back to indexed pages.
+
+## 📁 Project Structure
 
 ```text
 RAG-WebSupport-Agent/
@@ -156,6 +111,7 @@ RAG-WebSupport-Agent/
 │   ├── src/
 │   │   ├── config/
 │   │   │   ├── chroma.js
+│   │   │   ├── gemini.js
 │   │   │   └── queue.js
 │   │   ├── security/
 │   │   │   └── urlSafety.js
@@ -172,6 +128,7 @@ RAG-WebSupport-Agent/
 │   │   ├── app.js
 │   │   ├── server.js
 │   │   ├── worker.js
+│   │   ├── app.test.js
 │   │   └── ...
 │   ├── package.json
 │   └── .env.example
@@ -180,15 +137,15 @@ RAG-WebSupport-Agent/
 └── README.md
 ```
 
-*The structure above highlights key files; test files and other project configuration files are omitted for readability.*
+*This is a simplified overview. Some test files and configuration files are omitted.*
 
-## Prerequisites
+## 🚀 Getting Started
+
+### Prerequisites
 
 - Node.js and npm
 - Docker Desktop with Docker Compose
 - A Google Gemini API key
-
-## Installation and Setup
 
 ### 1. Clone the repository
 
@@ -197,7 +154,7 @@ git clone https://github.com/AmannRawat/RAG-WebSupport-Agent.git
 cd RAG-WebSupport-Agent
 ```
 
-### 2. Start the infrastructure
+### 2. Start ChromaDB and Valkey
 
 From the project root:
 
@@ -205,18 +162,27 @@ From the project root:
 docker compose up -d chromadb valkey
 ```
 
-This starts the ChromaDB and Valkey services defined in the Compose configuration. If your service names or Compose configuration differ, use the names defined in your local `docker-compose.yml`.
+This command assumes the Compose services are named `chromadb` and `valkey`.
 
-The current local development configuration uses host ports `8001` for ChromaDB and `6380` for Valkey.
+The current local development configuration uses:
 
-### 3. Configure the backend
+| Service | Host port |
+|---|---:|
+| ChromaDB | `8001` |
+| Valkey | `6380` |
+| Express API | `4000` |
+| Vite frontend | `5173` by default |
+
+Check `docker-compose.yml` if your local port mappings differ.
+
+### 3. Install backend dependencies
 
 ```bash
 cd server
 npm install
 ```
 
-Create `server/.env` using the following configuration:
+Create `server/.env`:
 
 ```env
 GEMINI_API_KEY=your_gemini_api_key
@@ -226,11 +192,11 @@ VALKEY_URL=redis://127.0.0.1:6380
 PORT=4000
 ```
 
-Keep API keys and other secrets out of Git. Use `.env.example` to document required variables without real credentials.
+Keep your actual API key in `.env`. Never commit secrets to GitHub.
 
-### 4. Start the API
+### 4. Start the Express API
 
-In the `server` directory:
+From the `server` directory:
 
 ```bash
 npm run dev:api
@@ -246,9 +212,9 @@ Open a second terminal in the `server` directory:
 npm run dev:worker
 ```
 
-The worker connects to Valkey and processes queued crawl jobs.
+The worker connects to Valkey and begins processing queued crawl jobs.
 
-### 6. Start the frontend
+### 6. Install and start the frontend
 
 Open a third terminal:
 
@@ -258,20 +224,28 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite, typically `http://localhost:5173`.
+Open the local URL printed by Vite, usually `http://localhost:5173`.
 
-Ensure the frontend API URL points to your running backend. The application defaults to `http://localhost:4000`.
+If necessary, configure `VITE_API_URL` to point to the Express API:
 
-## API Endpoints
+```env
+VITE_API_URL=http://localhost:4000
+```
 
-| Method | Endpoint | Purpose |
+**Local development note:** The commands above run the API, worker, and frontend locally, while ChromaDB and Valkey run in Docker. This avoids relying on stale application container images.
+
+## 🔌 API Reference
+
+| Method | Endpoint | Description |
 |---|---|---|
-| GET | `/health` | Check API health |
-| POST | `/api/crawls` | Validate and enqueue a website crawl |
-| GET | `/api/crawls/:jobId` | Retrieve crawl status, progress, and results |
-| POST | `/api/chat` | Ask a question about indexed website content |
+| `GET` | `/health` | Check API health |
+| `POST` | `/api/crawls` | Validate and enqueue a crawl job |
+| `GET` | `/api/crawls/:jobId` | Retrieve crawl status and results |
+| `POST` | `/api/chat` | Ask a question about indexed website content |
 
-### Example: Enqueue a crawl
+### Submit a crawl
+
+**Request**
 
 ```http
 POST /api/crawls
@@ -284,9 +258,19 @@ Content-Type: application/json
 }
 ```
 
-The API returns HTTP `202 Accepted` when the crawl job is successfully queued.
+A successfully queued job returns HTTP `202 Accepted` with a job ID that can be used to track progress.
 
-### Example: Ask a question
+### Check crawl status
+
+```http
+GET /api/crawls/YOUR_JOB_ID
+```
+
+The response includes job status, progress, crawl results when available, and failure information when applicable.
+
+### Ask a question
+
+**Request**
 
 ```http
 POST /api/chat
@@ -300,73 +284,84 @@ Content-Type: application/json
 }
 ```
 
-The chat endpoint requires the website to have indexed content. The response includes an answer and source URLs.
+The website must have indexed content. The response includes the generated answer and source URLs.
 
-## Testing
+## 🧪 Testing
 
-Run the automated backend tests from the `server` directory:
+Run the backend test suite from the `server` directory:
 
 ```bash
 npm test
 ```
 
-Run tests in watch mode during development:
+Run tests in watch mode:
 
 ```bash
 npm run test:watch
 ```
 
-The test suite covers API behavior, request validation, embedding generation, vector storage, crawl job processing, and crawler checkpoint behavior. External services are mocked in unit tests so these tests can run without live API calls.
+The test suite covers API routes, request validation, embedding generation, vector storage, crawl-job processing, and crawler checkpoint behavior.
 
-The project has also been tested with live crawling and question answering against a running local infrastructure.
+External dependencies are mocked in unit tests, allowing the tests to run without live Gemini, ChromaDB, or Valkey connections.
 
-## Engineering Decisions
+The current suite contains **34 passing tests**.
 
-### Asynchronous job processing
+## 🧠 Engineering Decisions
 
-Crawling, scraping, and embedding can take longer than a typical HTTP request. BullMQ allows the API to accept work quickly while a separate worker handles long-running jobs.
+### Asynchronous processing
+
+Website crawling and embedding generation can take considerably longer than a normal HTTP request. A background worker allows the API to enqueue work and respond without waiting for the entire crawl to finish.
 
 ### Retry and recovery
 
-BullMQ is configured for multiple attempts with exponential backoff. Page checkpoints help the crawler avoid repeating completed work during retries.
+BullMQ supports configurable retries and exponential backoff. Page-level checkpoints reduce repeated work when a job resumes.
 
-### Idempotent vector writes
+### Safer repeated writes
 
-Deterministic vector IDs and ChromaDB upserts help prevent duplicate records when the same chunks are indexed again.
+Deterministic vector IDs and ChromaDB upserts help prevent duplicate records when chunks are indexed again. This does not make the entire crawl transactional.
 
 ### Website-scoped retrieval
 
-Retrieved content is filtered by website origin so that answers are based on the selected website rather than unrelated indexed content.
+Queries filter retrieved chunks by website origin, helping keep answers relevant to the selected website.
 
-### Grounded responses
+### Grounded generation
 
-The answer-generation prompt instructs Gemini to rely on retrieved content and acknowledge when evidence is insufficient.
+The answer-generation prompt instructs Gemini to rely on retrieved context, acknowledge insufficient evidence, and avoid following instructions embedded in untrusted website content.
 
-### URL safety
+### URL security
 
-The application validates HTTP/HTTPS URLs and checks destinations to reduce server-side request forgery (SSRF) risks. Production deployment should also enforce network-level egress restrictions and protect against DNS rebinding.
+The application validates HTTP/HTTPS URLs and checks destinations to reduce SSRF risks. Production deployment should additionally enforce network-level egress restrictions and address DNS rebinding risks.
 
-## Challenges Solved
+### Automated testing
 
-- **JavaScript-rendered content:** Used Puppeteer to extract content rendered by React applications.
-- **Long webpage content:** Implemented text chunking before generating embeddings.
-- **Repeated crawl work:** Normalized URLs, tracked visited pages, and added page-level checkpoints.
-- **Long-running requests:** Moved crawling to a BullMQ background worker.
-- **Temporary failures:** Configured job retries and exponential backoff.
-- **Relevant answers:** Used embedding-based retrieval before generating answers.
-- **Unreliable page coverage:** Tracked crawl results and distinguished partial success from total failure.
-- **Testing without external dependencies:** Mocked Gemini, ChromaDB, queue services, and crawler dependencies in automated tests.
+Vitest and Supertest provide repeatable tests for API behavior and core services without requiring real external API calls for every test.
 
-## Current Limitations
+## 🧩 Challenges Solved
+
+- **JavaScript-rendered websites:** Used Puppeteer to extract rendered content.
+- **Long webpage content:** Implemented chunking before embedding generation.
+- **Repeated crawling:** Added URL normalization, visited-page tracking, and checkpoints.
+- **Long-running tasks:** Separated crawl processing from the HTTP request lifecycle.
+- **Transient failures:** Configured job retries with exponential backoff.
+- **Relevant AI responses:** Implemented embedding-based retrieval before answer generation.
+- **Partial crawl failures:** Tracked crawl outcomes instead of treating every incomplete crawl as total failure.
+- **External-service testing:** Mocked dependencies to test error handling and core logic in isolation.
+
+## ⚠️ Current Limitations
 
 - Crawling is restricted to the starting website's origin.
-- Website coverage depends on page accessibility, JavaScript rendering, and the crawler's configured page and depth limits.
-- Answer quality depends on the quality and completeness of indexed content.
-- The current system is not a substitute for production-grade authentication, authorization, network isolation, and operational monitoring.
+- Some pages may be inaccessible or fail during rendering and extraction.
+- Answer quality depends on the completeness of the indexed content and retrieval relevance.
+- Checkpointing helps recovery but does not guarantee exactly-once processing.
+- Production use requires additional deployment hardening, authentication and authorization where appropriate, network isolation, and operational monitoring.
 
-## Author
+## 👨‍💻 Author
 
 **Aman Rawat**
 
-- GitHub: https://github.com/AmannRawat
-- LinkedIn: https://www.linkedin.com/in/amanrwtt
+- GitHub: [AmannRawat](https://github.com/AmannRawat)
+- LinkedIn: [amanrwtt](https://www.linkedin.com/in/amanrwtt)
+
+---
+
+*SiteMind AI — turning website content into searchable knowledge.*
