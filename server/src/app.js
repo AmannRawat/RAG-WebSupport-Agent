@@ -21,8 +21,12 @@ const allowedOrigins = [
 app.use(
   cors({
     origin(origin, callback) {
-      // Allow requests without an Origin header, such as local CLI tools.
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow requests without an Origin header, such as local CLI tools, or any localhost dev port.
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+      ) {
         return callback(null, true);
       }
 
