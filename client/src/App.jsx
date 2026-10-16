@@ -23,7 +23,7 @@ export default function App() {
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [apiOnline, setApiOnline] = useState(false);
+  const [apiStatus, setApiStatus] = useState("checking");
 
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([]);
@@ -46,15 +46,17 @@ export default function App() {
         const response = await fetch(`${API_URL}/health`);
 
         if (!response.ok) {
-          throw new Error("API unavailable");
+          throw new Error("Health check failed");
         }
 
         if (!cancelled) {
-          setApiOnline(true);
+          setApiStatus("online");
         }
       } catch {
         if (!cancelled) {
-          setApiOnline(false);
+          // A failed fetch may be caused by an extension(UBLOCK ORIGIN) or network issue.
+          // It does not prove the entire API is offline.
+          setApiStatus("unknown");
         }
       }
     }
@@ -267,17 +269,30 @@ export default function App() {
 
           <div
             className="flex items-center gap-2 rounded-full border border-[#292929] bg-[#141414] px-3 py-1.5 text-xs text-[#A3A3A3]"
-            title={apiOnline ? "Backend API is online and responding" : "Backend API unreachable"}
+            title={
+              apiStatus === "online"
+                ? "Health endpoint responded successfully"
+                : apiStatus === "checking"
+                  ? "Checking API health"
+                  : "Health check unavailable; the API may still be working"
+            }
           >
             <span
-              className={`h-2 w-2 rounded-full ${
-                apiOnline
+              className={`h-2 w-2 rounded-full ${apiStatus === "online"
                   ? "bg-[#22C55E] ring-2 ring-[#22C55E]/30"
-                  : "bg-[#EF4444] ring-2 ring-[#EF4444]/30"
-              }`}
+                  : apiStatus === "checking"
+                    ? "bg-[#EAB308] ring-2 ring-[#EAB308]/30"
+                    : "bg-[#737373] ring-2 ring-[#737373]/30"
+                }`}
               aria-hidden="true"
             />
-            <span>{apiOnline ? "API connected" : "API offline"}</span>
+            <span>
+              {apiStatus === "online"
+                ? "API connected"
+                : apiStatus === "checking"
+                  ? "Checking API"
+                  : "API status unknown"}
+            </span>
           </div>
         </div>
       </header>
@@ -422,15 +437,14 @@ export default function App() {
               aria-valuemax={100}
             >
               <div
-                className={`h-full rounded-full transition-all duration-300 ease-out ${
-                  failed
-                    ? "bg-[#EF4444]"
-                    : partiallyCompleted
+                className={`h-full rounded-full transition-all duration-300 ease-out ${failed
+                  ? "bg-[#EF4444]"
+                  : partiallyCompleted
                     ? "bg-[#EAB308]"
                     : completed
-                    ? "bg-[#22C55E]"
-                    : "bg-[#FF2A2A]"
-                }`}
+                      ? "bg-[#22C55E]"
+                      : "bg-[#FF2A2A]"
+                  }`}
                 style={{
                   width: `${Math.max(
                     0,
@@ -450,11 +464,10 @@ export default function App() {
             {/* Completion banners */}
             {completed && (
               <div
-                className={`mt-3 flex items-center gap-2 rounded-lg border p-3 text-xs leading-relaxed ${
-                  partiallyCompleted
-                    ? "border-[#EAB308]/20 bg-[#EAB308]/10 text-[#FACC15]"
-                    : "border-[#22C55E]/20 bg-[#22C55E]/10 text-[#4ADE80]"
-                }`}
+                className={`mt-3 flex items-center gap-2 rounded-lg border p-3 text-xs leading-relaxed ${partiallyCompleted
+                  ? "border-[#EAB308]/20 bg-[#EAB308]/10 text-[#FACC15]"
+                  : "border-[#22C55E]/20 bg-[#22C55E]/10 text-[#4ADE80]"
+                  }`}
               >
                 {partiallyCompleted ? (
                   <CircleAlert size={16} className="shrink-0" aria-hidden="true" />
@@ -558,9 +571,8 @@ export default function App() {
               {messages.map((message, index) => (
                 <div
                   key={`${index}-${message.role}`}
-                  className={`flex gap-2.5 ${
-                    message.role === "user" ? "justify-end" : "justify-start"
-                  }`}
+                  className={`flex gap-2.5 ${message.role === "user" ? "justify-end" : "justify-start"
+                    }`}
                 >
                   {message.role === "assistant" && (
                     <div
@@ -572,11 +584,10 @@ export default function App() {
                   )}
 
                   <div
-                    className={`min-w-0 max-w-[88%] rounded-xl px-4 py-2.5 text-sm ${
-                      message.role === "user"
-                        ? "bg-[#FF2A2A] font-medium text-white"
-                        : "border border-[#292929] bg-[#1C1C1C] text-[#F5F5F5]"
-                    }`}
+                    className={`min-w-0 max-w-[88%] rounded-xl px-4 py-2.5 text-sm ${message.role === "user"
+                      ? "bg-[#FF2A2A] font-medium text-white"
+                      : "border border-[#292929] bg-[#1C1C1C] text-[#F5F5F5]"
+                      }`}
                   >
                     <div className="whitespace-pre-wrap break-words leading-relaxed text-sm">
                       {message.text}
