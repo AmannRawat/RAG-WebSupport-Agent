@@ -28,7 +28,7 @@ Built with **React, Node.js, Express, BullMQ, Valkey, Puppeteer, Google Gemini, 
 
 The application separates website ingestion from question answering. Crawling runs in a background worker, while the API handles incoming requests and chat queries.
 
-![SiteMind AI System Architecture](https://github.com/AmannRawat/RAG-WebSupport-Agent/blob/main/Architecture.png?raw=true)
+![SiteMind AI System Architecture](https://github.com/AmannRawat/SiteMind-AI/blob/main/Architecture.png?raw=true)
 
 ### Website ingestion pipeline
 
