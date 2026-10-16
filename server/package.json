@@ -14,7 +14,8 @@
     "api": "node src/server.js",
     "dev:api": "node --watch src/server.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "start:render": "concurrently --kill-others \"npm run api\" \"npm run worker\""
   },
   "dependencies": {
     "@google/genai": "^2.24.0",
@@ -22,6 +23,7 @@
     "axios": "^1.20.0",
     "bullmq": "^6.3.13",
     "cheerio": "^1.2.0",
+    "concurrently": "^10.0.6",
     "cors": "^2.8.6",
     "dotenv": "^18.0.3",
     "express": "^5.3.0",
