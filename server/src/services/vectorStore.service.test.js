@@ -1,11 +1,19 @@
+
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { getWebCollection } = vi.hoisted(() => ({
-  getWebCollection: vi.fn(),
+const { qdrantClient, ensureCollection } = vi.hoisted(() => ({
+  qdrantClient: {
+    upsert: vi.fn(),
+    query: vi.fn(),
+    count: vi.fn(),
+  },
+  ensureCollection: vi.fn(),
 }));
 
-vi.mock("../config/chroma.js", () => ({
-  getWebCollection,
+vi.mock("../config/qdrant.js", () => ({
+  qdrantClient,
+  ensureCollection,
+  QDRANT_COLLECTION: "website_support_chunks",
 }));
 
 import {
@@ -15,136 +23,151 @@ import {
 } from "./vectorStore.service.js";
 
 describe("vectorStore.service", () => {
-  let collection;
-
   beforeEach(() => {
     vi.clearAllMocks();
-
-    collection = {
-      upsert: vi.fn().mockResolvedValue(undefined),
-      query: vi.fn().mockResolvedValue({
-        documents: [["Relevant website content"]],
-        metadatas: [[
-          {
+    ensureCollection.mockResolvedValue("website_support_chunks");
+    qdrantClient.upsert.mockResolvedValue({});
+    qdrantClient.query.mockResolvedValue({
+      points: [
+        {
+          id: "00000000-0000-5000-8000-000000000001",
+          payload: {
+            text: "Relevant website content",
             url: "https://example.com/about",
             websiteUrl: "https://example.com",
             title: "About",
           },
-        ]],
-      }),
-      count: vi.fn().mockResolvedValue(5),
-    };
-
-    getWebCollection.mockResolvedValue(collection);
+        },
+      ],
+    });
+    qdrantClient.count.mockResolvedValue({ count: 5 });
   });
 
-  describe("storeChunk", () => {
-    it("stores a chunk with its embedding and metadata", async () => {
-      await storeChunk({
-        id: "chunk-1",
-        embedding: [0.1, 0.2, 0.3],
-        url: "https://example.com/about",
-        websiteUrl: "https://example.com",
-        text: "Relevant website content",
-        title: "About",
-      });
+  it("stores a chunk with its embedding and metadata", async () => {
+    const embedding = Array(3072).fill(0.1);
 
-      expect(collection.upsert).toHaveBeenCalledWith({
-        ids: ["chunk-1"],
-        embeddings: [[0.1, 0.2, 0.3]],
-        documents: ["Relevant website content"],
-        metadatas: [
-          {
-            url: "https://example.com/about",
-            websiteUrl: "https://example.com",
-            title: "About",
-          },
-        ],
-      });
+    await storeChunk({
+      id: "chunk-1",
+      embedding,
+      url: "https://example.com/about",
+      websiteUrl: "https://example.com",
+      text: "Relevant website content",
+      title: "About",
     });
 
-    it("defaults the title to an empty string", async () => {
-      await storeChunk({
-        id: "chunk-2",
-        embedding: [0.4, 0.5],
+    expect(ensureCollection).toHaveBeenCalledOnce();
+    expect(qdrantClient.upsert).toHaveBeenCalledOnce();
+
+    const [collection, request] = qdrantClient.upsert.mock.calls[0];
+
+    expect(collection).toBe("website_support_chunks");
+    expect(request.wait).toBe(true);
+    expect(request.points).toHaveLength(1);
+    expect(request.points[0].id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+    );
+    expect(request.points[0].vector).toEqual(embedding);
+    expect(request.points[0].payload).toEqual({
+      url: "https://example.com/about",
+      websiteUrl: "https://example.com",
+      title: "About",
+      text: "Relevant website content",
+    });
+  });
+
+  it("rejects an embedding with the wrong dimension", async () => {
+    await expect(
+      storeChunk({
+        id: "chunk-1",
+        embedding: [0.1, 0.2, 0.3],
         url: "https://example.com/",
         websiteUrl: "https://example.com",
         text: "Home page",
-      });
+      })
+    ).rejects.toThrow("Embedding has 3 dimensions");
 
-      expect(collection.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          metadatas: [
-            expect.objectContaining({ title: "" }),
+    expect(qdrantClient.upsert).not.toHaveBeenCalled();
+  });
+
+  it("retrieves chunks filtered by website and maps the result", async () => {
+    const embedding = Array(3072).fill(0.1);
+
+    const result = await retrieveChunks(
+      embedding,
+      "https://example.com",
+      3
+    );
+
+    expect(qdrantClient.query).toHaveBeenCalledWith(
+      "website_support_chunks",
+      expect.objectContaining({
+        query: embedding,
+        limit: 3,
+        filter: {
+          must: [
+            {
+              key: "websiteUrl",
+              match: { value: "https://example.com" },
+            },
           ],
-        })
-      );
+        },
+        with_payload: true,
+        with_vector: false,
+      })
+    );
+
+    expect(result.documents[0]).toEqual([
+      "Relevant website content",
+    ]);
+    expect(result.metadatas[0][0]).toEqual({
+      url: "https://example.com/about",
+      websiteUrl: "https://example.com",
+      title: "About",
     });
   });
 
-  describe("retrieveChunks", () => {
-    it("filters by website and requests the top three results", async () => {
-      await retrieveChunks(
-        [0.1, 0.2, 0.3],
+  it("supports a custom result limit", async () => {
+    await retrieveChunks(
+      Array(3072).fill(0.1),
+      "https://example.com",
+      5
+    );
+
+    expect(qdrantClient.query.mock.calls[0][1].limit).toBe(5);
+  });
+
+  it("returns empty arrays when no chunks match", async () => {
+    qdrantClient.query.mockResolvedValue({ points: [] });
+
+    const result = await retrieveChunks(
+      Array(3072).fill(0.1),
+      "https://unknown.example"
+    );
+
+    expect(result).toEqual({
+      documents: [[]],
+      metadatas: [[]],
+    });
+  });
+
+  it("propagates database errors", async () => {
+    qdrantClient.query.mockRejectedValue(
+      new Error("Qdrant unavailable")
+    );
+
+    await expect(
+      retrieveChunks(
+        Array(3072).fill(0.1),
         "https://example.com"
-      );
-
-      expect(collection.query).toHaveBeenCalledWith({
-        queryEmbeddings: [[0.1, 0.2, 0.3]],
-        nResults: 3,
-        where: { websiteUrl: "https://example.com" },
-        include: ["metadatas", "documents"],
-      });
-    });
-
-    it("supports a custom result limit", async () => {
-      await retrieveChunks(
-        [0.1, 0.2],
-        "https://example.com",
-        5
-      );
-
-      expect(collection.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          nResults: 5,
-          where: { websiteUrl: "https://example.com" },
-        })
-      );
-    });
-
-    it("returns an empty result when no chunks match", async () => {
-      const emptyResult = {
-        documents: [[]],
-        metadatas: [[]],
-      };
-
-      collection.query.mockResolvedValue(emptyResult);
-
-      const result = await retrieveChunks(
-        [0.1, 0.2],
-        "https://unknown.example"
-      );
-
-      expect(result).toEqual(emptyResult);
-    });
-
-    it("propagates database errors", async () => {
-      collection.query.mockRejectedValue(
-        new Error("ChromaDB unavailable")
-      );
-
-      await expect(
-        retrieveChunks([0.1, 0.2], "https://example.com")
-      ).rejects.toThrow("ChromaDB unavailable");
-    });
+      )
+    ).rejects.toThrow("Qdrant unavailable");
   });
 
-  describe("getVectorCount", () => {
-    it("returns the collection vector count", async () => {
-      const count = await getVectorCount();
-
-      expect(count).toBe(5);
-      expect(collection.count).toHaveBeenCalledOnce();
-    });
+  it("returns the vector count", async () => {
+    await expect(getVectorCount()).resolves.toBe(5);
+    expect(qdrantClient.count).toHaveBeenCalledWith(
+      "website_support_chunks",
+      { exact: true }
+    );
   });
 });

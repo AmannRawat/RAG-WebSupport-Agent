@@ -207,7 +207,7 @@ export async function crawlWebsite(startUrl, options = {}) {
 
     await visitPage(start, 0);
 
-    // A failure to query ChromaDB also propagates to BullMQ.
+    // A failure to query VectorDB also propagates to BullMQ.
     const vectorCount = await getVectorCount();
 
     return {

@@ -1,12 +1,6 @@
-services:
-  chromadb:
-    image: chromadb/chroma
-    ports:
-      - "8001:8000"
-    volumes:
-      - chroma_data:/data
-    restart: unless-stopped
 
+
+services:
   valkey:
     image: valkey/valkey:8-alpine
     command: valkey-server --appendonly yes
@@ -23,16 +17,14 @@ services:
     env_file:
       - ./server/.env
     environment:
+      NODE_ENV: production
       PORT: "4000"
-      CHROMA_HOST: chromadb
-      CHROMA_PORT: "8000"
       PUPPETEER_NO_SANDBOX: "true"
       VALKEY_URL: redis://valkey:6379
       CLIENT_ORIGIN: http://localhost:5174
     ports:
       - "4000:4000"
     depends_on:
-      - chromadb
       - valkey
     restart: unless-stopped
 
@@ -44,12 +36,10 @@ services:
     env_file:
       - ./server/.env
     environment:
-      CHROMA_HOST: chromadb
-      CHROMA_PORT: "8000"
+      NODE_ENV: production
       PUPPETEER_NO_SANDBOX: "true"
       VALKEY_URL: redis://valkey:6379
     depends_on:
-      - chromadb
       - valkey
     restart: unless-stopped
 
@@ -66,5 +56,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  chroma_data:
   valkey_data:

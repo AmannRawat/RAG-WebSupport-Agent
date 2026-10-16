@@ -1,6 +1,7 @@
+
 FROM node:24-bookworm-slim
 
-# Install libraries needed by Puppeteer's browser.
+# Install Chrome runtime dependencies and the archive extractor.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     fonts-liberation \
@@ -22,16 +23,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxdamage1 \
     libxext6 \
     libxfixes3 \
+    libxkbcommon0 \
     libxrandr2 \
+    libxshmfence1 \
+    unzip \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+
+# Let Puppeteer install its browser explicitly in the next step.
+RUN PUPPETEER_SKIP_DOWNLOAD=true npm ci
+
+RUN rm -rf /root/.cache/puppeteer \
+    && npx puppeteer browsers install chrome \
+    && test -x "$(find /root/.cache/puppeteer -type f -path '*/chrome-linux64/chrome' -print -quit)"
 
 ENV NODE_ENV=production
+ENV PUPPETEER_NO_SANDBOX=true
 
 COPY src ./src
 COPY index.js ./index.js

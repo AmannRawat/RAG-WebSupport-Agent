@@ -80,11 +80,11 @@ describe("processCrawlJob", () => {
 
   it("propagates infrastructure errors so BullMQ can retry", async () => {
     crawlWebsite.mockRejectedValue(
-      new Error("ChromaDB unavailable")
+      new Error("Qdrant unavailable")
     );
 
     await expect(processCrawlJob(job)).rejects.toThrow(
-      "ChromaDB unavailable"
+      "Qdrant unavailable"
     );
   });
 });
