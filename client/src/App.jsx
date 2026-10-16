@@ -16,6 +16,8 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { Analytics } from '@vercel/analytics/react';
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
 export default function App() {
@@ -279,10 +281,10 @@ export default function App() {
           >
             <span
               className={`h-2 w-2 rounded-full ${apiStatus === "online"
-                  ? "bg-[#22C55E] ring-2 ring-[#22C55E]/30"
-                  : apiStatus === "checking"
-                    ? "bg-[#EAB308] ring-2 ring-[#EAB308]/30"
-                    : "bg-[#737373] ring-2 ring-[#737373]/30"
+                ? "bg-[#22C55E] ring-2 ring-[#22C55E]/30"
+                : apiStatus === "checking"
+                  ? "bg-[#EAB308] ring-2 ring-[#EAB308]/30"
+                  : "bg-[#737373] ring-2 ring-[#737373]/30"
                 }`}
               aria-hidden="true"
             />
@@ -739,6 +741,7 @@ export default function App() {
           <span className="font-mono text-[11px] text-[#737373]">Production v1.0</span>
         </div>
       </footer>
+      <Analytics />
     </main>
   );
 }
