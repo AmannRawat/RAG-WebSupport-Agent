@@ -115,3 +115,16 @@ export async function getVectorCount() {
 
   return result.count;
 }
+
+export async function deleteChunks(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) return;
+
+  await ensureCollection();
+
+  const pointIds = ids.map(toPointId);
+
+  await qdrantClient.delete(QDRANT_COLLECTION, {
+    wait: true,
+    points: pointIds,
+  });
+}

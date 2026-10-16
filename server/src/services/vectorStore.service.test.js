@@ -6,6 +6,7 @@ const { qdrantClient, ensureCollection } = vi.hoisted(() => ({
     upsert: vi.fn(),
     query: vi.fn(),
     count: vi.fn(),
+    delete: vi.fn(),
   },
   ensureCollection: vi.fn(),
 }));
@@ -20,13 +21,17 @@ import {
   storeChunk,
   retrieveChunks,
   getVectorCount,
+  deleteChunks,
 } from "./vectorStore.service.js";
 
 describe("vectorStore.service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
     ensureCollection.mockResolvedValue("website_support_chunks");
     qdrantClient.upsert.mockResolvedValue({});
+    qdrantClient.delete.mockResolvedValue({});
+
     qdrantClient.query.mockResolvedValue({
       points: [
         {
@@ -40,6 +45,7 @@ describe("vectorStore.service", () => {
         },
       ],
     });
+
     qdrantClient.count.mockResolvedValue({ count: 5 });
   });
 
@@ -119,6 +125,7 @@ describe("vectorStore.service", () => {
     expect(result.documents[0]).toEqual([
       "Relevant website content",
     ]);
+
     expect(result.metadatas[0][0]).toEqual({
       url: "https://example.com/about",
       websiteUrl: "https://example.com",
@@ -150,6 +157,35 @@ describe("vectorStore.service", () => {
     });
   });
 
+  it("deletes chunks using their deterministic Qdrant IDs", async () => {
+    await deleteChunks([
+      "https://example.com/::chunk-1",
+      "https://example.com/::chunk-2",
+    ]);
+
+    expect(ensureCollection).toHaveBeenCalledOnce();
+    expect(qdrantClient.delete).toHaveBeenCalledOnce();
+
+    const [collection, request] = qdrantClient.delete.mock.calls[0];
+
+    expect(collection).toBe("website_support_chunks");
+    expect(request.wait).toBe(true);
+    expect(request.points).toHaveLength(2);
+
+    for (const id of request.points) {
+      expect(id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+      );
+    }
+  });
+
+  it("does not call Qdrant when deleting an empty list", async () => {
+    await deleteChunks([]);
+
+    expect(ensureCollection).not.toHaveBeenCalled();
+    expect(qdrantClient.delete).not.toHaveBeenCalled();
+  });
+
   it("propagates database errors", async () => {
     qdrantClient.query.mockRejectedValue(
       new Error("Qdrant unavailable")
@@ -165,6 +201,7 @@ describe("vectorStore.service", () => {
 
   it("returns the vector count", async () => {
     await expect(getVectorCount()).resolves.toBe(5);
+
     expect(qdrantClient.count).toHaveBeenCalledWith(
       "website_support_chunks",
       { exact: true }

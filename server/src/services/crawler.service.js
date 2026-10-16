@@ -1,12 +1,19 @@
 
+import { createHash } from "node:crypto";
 import { scrapeReactWebsite } from "./scraper.service.js";
 import { chunkText } from "./chunking.service.js";
 import { generateVectorEmbedding } from "./embedding.service.js";
-import { storeChunk, getVectorCount } from "./vectorStore.service.js";
+import {
+    storeChunk,
+    getVectorCount,
+    deleteChunks,
+} from "./vectorStore.service.js";
 import { validatePublicHttpUrl } from "../security/urlSafety.js";
 import {
     getPageCheckpoint,
     savePageCheckpoint,
+    getPageState,
+    savePageState,
 } from "./crawlCheckpoint.service.js";
 
 function normalizeUrl(value) {
@@ -25,10 +32,19 @@ function normalizeUrl(value) {
     return url.href;
 }
 
+function hashPageContent(head, body) {
+    return createHash("sha256")
+        .update(head)
+        .update("\0")
+        .update(body)
+        .digest("hex");
+}
+
 export async function crawlWebsite(startUrl, options = {}) {
     const maxPages = options.maxPages ?? 20;
     const maxDepth = options.maxDepth ?? 2;
     const jobId = options.jobId;
+    const onProgress = options.onProgress;
 
     if (!jobId) {
         throw new Error(
@@ -43,6 +59,17 @@ export async function crawlWebsite(startUrl, options = {}) {
     let processedPages = 0;
     let indexedChunks = 0;
     let failedPages = 0;
+
+    async function reportProgress() {
+        if (!onProgress) return;
+
+        await onProgress({
+            processedPages,
+            discoveredPages: visited.size,
+            failedPages,
+            maxPages,
+        });
+    }
 
     async function visitPage(pageUrl, depth) {
         let normalizedUrl;
@@ -67,7 +94,6 @@ export async function crawlWebsite(startUrl, options = {}) {
             return;
         }
 
-        // Validate the destination before scraping it.
         try {
             await validatePublicHttpUrl(normalizedUrl);
         } catch (error) {
@@ -86,7 +112,7 @@ export async function crawlWebsite(startUrl, options = {}) {
 
         visited.add(normalizedUrl);
 
-        // Checkpoint-store failures must propagate to BullMQ.
+        // Job-specific checkpoint: recover completed work on a retry.
         const checkpoint = await getPageCheckpoint(jobId, normalizedUrl);
 
         if (
@@ -100,6 +126,8 @@ export async function crawlWebsite(startUrl, options = {}) {
 
             processedPages++;
             indexedChunks += checkpoint.indexedChunks;
+
+            await reportProgress();
 
             for (const link of checkpoint.internalLinks) {
                 if (visited.size >= maxPages) break;
@@ -124,7 +152,6 @@ export async function crawlWebsite(startUrl, options = {}) {
 
         console.log(`[Crawler] Crawling: ${normalizedUrl}`);
 
-        // Website loading/scraping errors are page failures.
         let scraped;
 
         try {
@@ -140,50 +167,94 @@ export async function crawlWebsite(startUrl, options = {}) {
         }
 
         const { head, body, internalLinks } = scraped;
+        const contentHash = hashPageContent(head, body);
 
-        // Embedding, vector writes, and checkpoint writes are deliberately
-        // outside the scraping catch. Their failures propagate to BullMQ.
-        if (head.trim()) {
-            const embedding = await generateVectorEmbedding(head);
+        // Cross-job page state: determine whether content changed.
+        const previousState = await getPageState(normalizedUrl);
 
-            await storeChunk({
-                id: `${normalizedUrl}::head`,
-                embedding,
-                url: normalizedUrl,
-                websiteUrl: allowedOrigin,
-                text: head,
-                title: "",
-            });
-        }
-
-        const chunks = chunkText(body);
         let pageIndexedChunks = 0;
 
-        for (const [index, chunk] of chunks.entries()) {
-            if (!chunk.trim()) continue;
+        if (
+            previousState?.contentHash === contentHash &&
+            Array.isArray(previousState.chunkIds) &&
+            Number.isInteger(previousState.indexedChunks)
+        ) {
+            // Reuse vectors for unchanged content.
+            console.log(
+                `[Crawler] Unchanged page; skipping embeddings: ${normalizedUrl}`
+            );
 
-            const embedding = await generateVectorEmbedding(chunk);
+            pageIndexedChunks = previousState.indexedChunks;
+            indexedChunks += pageIndexedChunks;
+        } else {
+            const newChunkIds = [];
 
-            await storeChunk({
-                id: `${normalizedUrl}::chunk-${index}`,
-                embedding,
-                url: normalizedUrl,
-                websiteUrl: allowedOrigin,
-                text: chunk,
-                title: "",
+            // Index the page heading.
+            if (head.trim()) {
+                const id = `${normalizedUrl}::${contentHash}::head`; const embedding = await generateVectorEmbedding(head);
+
+                await storeChunk({
+                    id,
+                    embedding,
+                    url: normalizedUrl,
+                    websiteUrl: allowedOrigin,
+                    text: head,
+                    title: "",
+                });
+
+                newChunkIds.push(id);
+            }
+
+            // Index the page body.
+            const chunks = chunkText(body);
+
+            for (const [index, chunk] of chunks.entries()) {
+                if (!chunk.trim()) continue;
+                const id = `${normalizedUrl}::${contentHash}::chunk-${index}`;
+                const embedding = await generateVectorEmbedding(chunk);
+
+                await storeChunk({
+                    id,
+                    embedding,
+                    url: normalizedUrl,
+                    websiteUrl: allowedOrigin,
+                    text: chunk,
+                    title: "",
+                });
+
+                newChunkIds.push(id);
+                indexedChunks++;
+                pageIndexedChunks++;
+            }
+
+            // Remove chunks from the previous version that no longer exist.
+            const oldChunkIds = Array.isArray(previousState?.chunkIds)
+                ? previousState.chunkIds
+                : [];
+
+            const newChunkIdSet = new Set(newChunkIds);
+            const staleChunkIds = oldChunkIds.filter(
+                (id) => !newChunkIdSet.has(id)
+            );
+
+            await deleteChunks(staleChunkIds);
+
+            // Save state only after vector writes and stale-chunk deletion.
+            await savePageState(normalizedUrl, {
+                contentHash,
+                chunkIds: newChunkIds,
+                indexedChunks: pageIndexedChunks,
             });
-
-            indexedChunks++;
-            pageIndexedChunks++;
         }
 
-        // Mark the page complete only after its vector writes succeed.
+        // Save job recovery state after the page is successfully processed.
         await savePageCheckpoint(jobId, normalizedUrl, {
             indexedChunks: pageIndexedChunks,
             internalLinks,
         });
 
         processedPages++;
+        await reportProgress();
 
         for (const link of internalLinks) {
             if (visited.size >= maxPages) break;
@@ -199,7 +270,6 @@ export async function crawlWebsite(startUrl, options = {}) {
             }
 
             if (new URL(nextUrl).origin === allowedOrigin) {
-                // Do not swallow child infrastructure errors.
                 await visitPage(nextUrl, depth + 1);
             }
         }
@@ -207,7 +277,6 @@ export async function crawlWebsite(startUrl, options = {}) {
 
     await visitPage(start, 0);
 
-    // A failure to query VectorDB also propagates to BullMQ.
     const vectorCount = await getVectorCount();
 
     return {
