@@ -16,6 +16,7 @@ import { validatePublicHttpUrl } from "./security/urlSafety.js";
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
+  "https://getsitemind.vercel.app",
 ];
 
 app.use(
