@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { Analytics } from '@vercel/analytics/react';
+import posthog from "./posthog.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
@@ -151,7 +152,10 @@ export default function App() {
         state: data.status || "waiting",
         progress: 0,
       });
+      posthog.capture("crawl_started");
+      posthog.logger.info("crawl request accepted", { source: "web" });
     } catch (err) {
+      posthog.capture("crawl_start_failed");
       setError(
         err.message?.includes("Failed to fetch") || err.message?.includes("NetworkError")
           ? `Could not reach the SiteMind API at ${API_URL}. Please ensure the backend server is running.`
@@ -169,6 +173,7 @@ export default function App() {
 
     if (!userQuestion || !websiteUrl || chatLoading) return;
 
+    posthog.capture("chat_question_submitted");
     setError("");
     setChatLoading(true);
     setQuestion("");
@@ -207,6 +212,8 @@ export default function App() {
           sources: data.sources || [],
         },
       ]);
+      posthog.capture("chat_answer_received");
+      posthog.logger.info("chat answer displayed", { source: "web" });
     } catch (err) {
       setError(err.message || "Could not reach the chat API.");
     } finally {
@@ -215,6 +222,7 @@ export default function App() {
   }
 
   function resetChat() {
+    posthog.capture("chat_cleared");
     setMessages([]);
     setError("");
   }

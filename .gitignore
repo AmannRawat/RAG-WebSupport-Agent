@@ -9,6 +9,9 @@ node_modules/
 # ChromaDB
 chroma_data/
 
+# Local Claude Code configuration
+.claude/
+
 # Build output
 dist/
 build/
