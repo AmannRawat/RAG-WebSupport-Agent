@@ -146,11 +146,28 @@ app.post("/api/chat", chatRateLimit, async (req, res) => {
     );
 
     return res.json(result);
+
   } catch (error) {
     console.error("[API] Chat failed:", error);
 
+    if (error?.statusCode === 503) {
+      return res.status(503).json({
+        error:
+          "The AI service is temporarily busy. Please wait a few seconds and try again.",
+      });
+    }
+
+    const upstreamStatus = Number(error?.status ?? error?.code);
+
+    if (upstreamStatus === 429) {
+      return res.status(429).json({
+        error:
+          "The AI service is rate-limited right now. Please wait before asking another question.",
+      });
+    }
+
     return res.status(500).json({
-      error: "Unable to answer the question right now.",
+      error: "Unable to answer the question right now. Please try again.",
     });
   }
 });

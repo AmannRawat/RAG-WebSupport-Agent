@@ -192,7 +192,7 @@ describe("Website Support API", () => {
 
             expect(response.status).toBe(500);
             expect(response.body.error).toBe(
-                "Unable to answer the question right now."
+                "Unable to answer the question right now. Please try again."
             );
         });
     });
