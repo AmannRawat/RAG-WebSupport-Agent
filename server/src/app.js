@@ -11,6 +11,7 @@ import {
   chatRateLimit,
 } from "./middleware/rateLimiters.js";
 const app = express();
+app.set("trust proxy", 1);
 import { validatePublicHttpUrl } from "./security/urlSafety.js";
 
 const allowedOrigins = [
