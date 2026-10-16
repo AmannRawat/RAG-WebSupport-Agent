@@ -49,4 +49,4 @@ COPY index.js ./index.js
 
 EXPOSE 4000
 
-CMD ["npm", "run", "api"]
+CMD ["npm", "run", "start:render"]
